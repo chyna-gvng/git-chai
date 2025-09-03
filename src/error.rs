@@ -16,17 +16,7 @@ pub enum GitChaiError {
     #[error("Parse error: {0}")]
     ParseError(String),
     
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-    
-    #[error("No changes detected")]
-    NoChangesError,
-    
-    #[error("Invalid path: {0}")]
-    InvalidPathError(String),
-    
-    #[error("Not a git repository: {0}")]
-    NotGitRepoError(String),
+
 }
 
 
@@ -50,16 +40,6 @@ mod tests {
         let parse_error = GitChaiError::ParseError("test".to_string());
         assert!(parse_error.to_string().contains("Parse error"));
         
-        let config_error = GitChaiError::ConfigError("test".to_string());
-        assert!(config_error.to_string().contains("Configuration error"));
-        
-        let no_changes = GitChaiError::NoChangesError;
-        assert!(no_changes.to_string().contains("No changes detected"));
-        
-        let invalid_path = GitChaiError::InvalidPathError("test".to_string());
-        assert!(invalid_path.to_string().contains("Invalid path"));
-        
-        let not_git_repo = GitChaiError::NotGitRepoError("test".to_string());
-        assert!(not_git_repo.to_string().contains("Not a git repository"));
+
     }
 }
