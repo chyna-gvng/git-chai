@@ -64,7 +64,6 @@ pub enum ChangeType {
     Delete,
     Rename,
     Copy,
-    Untracked,
 }
 
 impl From<GitStatus> for ChangeType {
@@ -88,7 +87,6 @@ impl fmt::Display for ChangeType {
             ChangeType::Delete => write!(f, "del"),
             ChangeType::Rename => write!(f, "rename"),
             ChangeType::Copy => write!(f, "copy"),
-            ChangeType::Untracked => write!(f, "untracked"),
         }
     }
 }
@@ -160,6 +158,5 @@ mod tests {
         assert_eq!(ChangeType::Delete.to_string(), "del");
         assert_eq!(ChangeType::Rename.to_string(), "rename");
         assert_eq!(ChangeType::Copy.to_string(), "copy");
-        assert_eq!(ChangeType::Untracked.to_string(), "untracked");
     }
 }
