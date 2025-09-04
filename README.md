@@ -67,11 +67,12 @@ Fully autonomous operation with push and verbose logging:
 git-chai --headless --push --verbose
 ```
 
-Development workflow with continuous commit and push:
+Development workflow with continuous commit:
 ```bash
 # In one terminal - continuously commit changes
-git-chai --headless --push
+git-chai --headless
 
 # In another terminal - work on your code
 # All changes will be automatically committed and tracked
+# Manually push when done; git push
 ```
