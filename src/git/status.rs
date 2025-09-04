@@ -20,7 +20,7 @@ pub fn get_changed_files(repo_path: &Path) -> Result<Vec<GitChange>, GitChaiErro
         .arg("status")
         .arg("--porcelain=v1")
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
