@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[allow(clippy::enum_variant_names)]
 pub enum GitChaiError {
     #[error("Git command failed: {command}: {stderr}")]
     GitCommandError {
