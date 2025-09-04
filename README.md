@@ -34,22 +34,44 @@ git-chai [OPTIONS]
 
 ### Examples
 
+#### Basic Usage
 Run once in current directory:
 ```bash
 git-chai
 ```
 
-Run in headless mode (continuous monitoring):
-```bash
-git-chai --headless
-```
-
-Dry run to see what would be committed:
+Check what would happen without making changes:
 ```bash
 git-chai --dry-run
 ```
 
-Run in specific repository with push enabled:
+#### Intermediate Usage
+Run with verbose output to see detailed operations:
 ```bash
-git-chai --repo-path /path/to/repo --push
+git-chai --verbose
+```
+
+Run in specific directory and push changes:
+```bash
+git-chai --repo-path /path/to/repo --push --verbose
+```
+
+#### Complete Autonomy
+Run continuously, monitoring for changes every 5 seconds:
+```bash
+git-chai --headless
+```
+
+Fully autonomous operation with push and verbose logging:
+```bash
+git-chai --headless --push --verbose
+```
+
+Development workflow with continuous commit and push:
+```bash
+# In one terminal - continuously commit changes
+git-chai --headless --push
+
+# In another terminal - work on your code
+# All changes will be automatically committed and tracked
 ```
