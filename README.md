@@ -26,7 +26,7 @@ git-chai [OPTIONS]
 | Short | Long | Description |
 |-------|------|-------------|
 | `-r` | `--repo-path` | Path to git repository (default: current directory) |
-| `-p` | `--push` | Push changes to remote after committing (default: true) |
+| `-p` | `--push` | Push changes to remote after committing (default: false) |
 | `-d` | `--dry-run` | Show what would be committed without actually committing |
 | `-v` | `--verbose` | Enable verbose output |
 | `-!` | `--headless` | Run continuously until interrupted (headless mode) |
@@ -49,7 +49,7 @@ Dry run to see what would be committed:
 git-chai --dry-run
 ```
 
-Run in specific repository without pushing:
+Run in specific repository with push enabled:
 ```bash
-git-chai --repo-path /path/to/repo --no-push
+git-chai --repo-path /path/to/repo --push
 ```
