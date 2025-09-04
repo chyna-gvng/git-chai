@@ -1,6 +1,6 @@
-# git-chai
+# Chai
 
-A Git automation tool that automatically stages and commits changes with intelligent grouping.
+A git automation tool that automatically stages and commits changes with intelligent grouping.
 
 ## Requirements
 
