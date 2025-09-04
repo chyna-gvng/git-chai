@@ -4,6 +4,7 @@ A git automation tool that automatically stages and commits changes with intelli
 
 ## Requirements
 
+- `git` - for version control operations
 - `curl` - for downloading and installation
 - `rustup` - for building Rust binaries (will be installed automatically if missing)
 
