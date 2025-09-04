@@ -34,45 +34,51 @@ git-chai [OPTIONS]
 
 ### Examples
 
-#### Basic Usage
-Run once in current directory:
+#### Level 1: Basic Commit Operations
 ```bash
+# Commit changes once (no push)
 git-chai
-```
 
-Check what would happen without making changes:
-```bash
+# Dry-run to preview what would be committed
 git-chai --dry-run
 ```
 
-#### Intermediate Usage
-Run with verbose output to see detailed operations:
+#### Level 2: Enhanced Commit Operations  
 ```bash
+# Commit with verbose output for debugging
 git-chai --verbose
+
+# Commit changes in specific repository
+git-chai --repo-path /path/to/repo
+
+# Preview commits with verbose details
+git-chai --dry-run --verbose
 ```
 
-Run in specific directory and push changes:
+#### Level 3: Commit + Push Operations
 ```bash
-git-chai --repo-path /path/to/repo --push --verbose
+# Commit and push changes once
+git-chai --push
+
+# Commit and push with verbose output
+git-chai --push --verbose
+
+# Commit and push from specific repository
+git-chai --repo-path /path/to/repo --push
 ```
 
-#### Complete Autonomy
-Run continuously, monitoring for changes every 5 seconds:
+#### Level 4: Complete Autonomy
 ```bash
+# Continuous monitoring with auto-commit (no push)
 git-chai --headless
-```
 
-Fully autonomous operation with push and verbose logging:
-```bash
+# Fully autonomous: continuous commit + push
+git-chai --headless --push
+
+# Autonomous with detailed logging
 git-chai --headless --push --verbose
-```
 
-Development workflow with continuous commit:
-```bash
-# In one terminal - continuously commit changes
-git-chai --headless
-
-# In another terminal - work on your code
-# All changes will be automatically committed and tracked
-# Manually push when done; git push
+# Development Workflow:
+# Terminal 1: git-chai --headless --push
+# Terminal 2: # Keep coding - changes auto-committed & pushed
 ```
