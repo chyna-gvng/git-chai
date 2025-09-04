@@ -13,7 +13,7 @@ pub fn create_commit_for_file(repo_path: &Path, filename: &str, change_type: &st
         .arg("-m")
         .arg(&message)
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
@@ -43,7 +43,7 @@ pub fn create_commit_for_directory(repo_path: &Path, directory: &Path, change_ty
         .arg("-m")
         .arg(&message)
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
@@ -68,7 +68,7 @@ pub fn push_changes(repo_path: &Path) -> Result<(), GitChaiError> {
         .arg("origin")
         .arg("HEAD")
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
