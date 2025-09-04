@@ -26,7 +26,7 @@ pub fn get_all_files_in_directory(repo_path: &Path, directory: &Path) -> Result<
         .arg("ls-files")
         .arg(dir_arg)
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
