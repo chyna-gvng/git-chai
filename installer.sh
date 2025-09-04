@@ -98,17 +98,21 @@ build_binary() {
 install_binary() {
     local install_path=""
     
-    # Try system locations first
+    # Try system locations first, then user directories
     if command -v sudo >/dev/null 2>&1 && [[ -w "/usr/local/bin" ]] || sudo -n true 2>/dev/null; then
         install_path="/usr/local/bin"
-    elif [[ -w "${HOME}/.cargo/bin" ]]; then
-        install_path="${HOME}/.cargo/bin"
-        mkdir -p "${install_path}"
     elif [[ -w "${HOME}/.local/bin" ]]; then
         install_path="${HOME}/.local/bin"
         mkdir -p "${install_path}"
-    else
+    elif [[ -w "${HOME}/bin" ]]; then
         install_path="${HOME}/bin"
+        mkdir -p "${install_path}"
+    elif [[ -w "${HOME}/.cargo/bin" ]]; then
+        install_path="${HOME}/.cargo/bin"
+        mkdir -p "${install_path}"
+    else
+        # Fallback: create ~/.local/bin if nothing else works
+        install_path="${HOME}/.local/bin"
         mkdir -p "${install_path}"
     fi
     
@@ -124,10 +128,38 @@ install_binary() {
     
     log_success "Installed to ${final_path}"
     
-    # Add to PATH if not already there
-    if [[ "${install_path}" != "/usr/local/bin" ]] && 
-       [[ ":${PATH}:" != *":${install_path}:"* ]]; then
-        log_warning "Add ${install_path} to your PATH:"
+    # For user directories, permanently update shell profile
+    if [[ "${install_path}" != "/usr/local/bin" ]]; then
+        update_shell_profile "${install_path}"
+    fi
+}
+
+update_shell_profile() {
+    local install_path="$1"
+    
+    # Check if the path is already in any shell profile
+    local profile_updated=false
+    local profile_files=("${HOME}/.profile" "${HOME}/.bashrc" "${HOME}/.zshrc" "${HOME}/.bash_profile")
+    
+    for profile_file in "${profile_files[@]}"; do
+        if [[ -f "${profile_file}" ]] && grep -q "export PATH.*${install_path}" "${profile_file}" 2>/dev/null; then
+            log_info "PATH already configured in ${profile_file}"
+            return 0
+        fi
+    done
+    
+    # Use ~/.profile as the universal choice (works for all login shells)
+    local target_profile="${HOME}/.profile"
+    
+    # Add PATH export to the profile
+    echo "export PATH=\"${install_path}:\$PATH\"" >> "${target_profile}"
+    
+    if [[ $? -eq 0 ]]; then
+        log_success "Permanently added ${install_path} to PATH in ${target_profile}"
+        log_info "The change will take effect after restarting your shell or running: source ${target_profile}"
+        profile_updated=true
+    else
+        log_warning "Could not update ${target_profile}, you may need to add to PATH manually:"
         echo "export PATH=\"${install_path}:\$PATH\""
     fi
 }
