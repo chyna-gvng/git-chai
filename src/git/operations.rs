@@ -11,7 +11,7 @@ pub fn stage_file(repo_path: &Path, filename: &str) -> Result<(), GitChaiError> 
         .arg("add")
         .arg(filename)
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
@@ -42,7 +42,7 @@ pub fn stage_directory(repo_path: &Path, directory: &Path) -> Result<(), GitChai
         .arg("--all")
         .arg(dir_arg)
         .output()
-        .map_err(|e| GitChaiError::IoError(e))?;
+        .map_err(GitChaiError::IoError)?;
     
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
