@@ -6,8 +6,6 @@ mod types;
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
-use std::thread;
-use std::time::Duration;
 use crate::git::{get_changed_files, stage_file, create_commit_for_file, push_changes, group_changes_by_directory, stage_directory, create_commit_for_directory, ChangeGroup};
 use crate::config::Config;
 
@@ -29,31 +27,14 @@ struct Args {
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
+    
+    /// Headless mode - run continuously until interrupted
+    #[arg(short = 'H', long, default_value_t = false)]
+    headless: bool,
 }
 
-fn main() -> Result<()> {
-    env_logger::init();
-    let args = Args::parse();
-    
-    // Set up Ctrl+C handler
-    let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, std::sync::atomic::Ordering::SeqCst);
-        println!("\nReceived interrupt signal, shutting down...");
-    }).expect("Error setting Ctrl+C handler");
-    
-    let config = Config {
-        repo_path: args.repo_path,
-        push_by_default: args.push,
-        commit_message_template: "{change_type}: {name}".to_string(),
-        min_files_for_directory_commit: 2,
-    };
-    
-    log::info!("git-chai: Starting in continuous mode. Press Ctrl+C to stop.");
-    
-    while running.load(std::sync::atomic::Ordering::SeqCst) {
-        log::info!("Scanning for changes in {:?}...", config.repo_path);
+fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
+    log::info!("Scanning for changes in {:?}...", config.repo_path);
     
     let changes = match get_changed_files(&config.repo_path) {
         Ok(changes) => {
@@ -88,7 +69,7 @@ fn main() -> Result<()> {
     };
     
     for group in change_groups {
-        if args.dry_run {
+        if dry_run {
             log::info!("Dry run: Would process group: {:?}", group);
             continue;
         }
@@ -147,29 +128,68 @@ fn main() -> Result<()> {
         }
     }
     
-        log::info!("Successfully committed all changes!");
+    log::info!("Successfully committed all changes!");
 
-        if args.push {
-            if let Err(e) = push_changes(&config.repo_path) {
-                log::warn!("Failed to push changes: {}", e);
-                log::warn!("Changes were committed locally but not pushed to remote.");
-            } else {
-                log::info!("Successfully pushed changes to remote!");
-            }
+    if push {
+        if let Err(e) = push_changes(&config.repo_path) {
+            log::warn!("Failed to push changes: {}", e);
+            log::warn!("Changes were committed locally but not pushed to remote.");
         } else {
-            log::info!("Skipping push (--no-push specified)");
+            log::info!("Successfully pushed changes to remote!");
         }
-        
-        // Wait before next scan
-        log::info!("Waiting 5 seconds before next scan...");
-        for _ in 0..50 {
-            if !running.load(std::sync::atomic::Ordering::SeqCst) {
-                break;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
+    } else {
+        log::info!("Skipping push (--no-push specified)");
     }
-
-    log::info!("git-chai stopped");
+    
     Ok(())
+}
+
+fn main() -> Result<()> {
+    env_logger::init();
+    let args = Args::parse();
+    
+    let config = Config {
+        repo_path: args.repo_path,
+        push_by_default: args.push,
+        commit_message_template: "{change_type}: {name}".to_string(),
+        min_files_for_directory_commit: 2,
+    };
+    
+    if args.headless {
+        // Headless mode: run continuously until Ctrl+C
+        use std::thread;
+        use std::time::Duration;
+        
+        // Set up Ctrl+C handler
+        let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            r.store(false, std::sync::atomic::Ordering::SeqCst);
+            println!("\nReceived interrupt signal, shutting down...");
+        }).expect("Error setting Ctrl+C handler");
+
+        log::info!("git-chai: Starting in headless mode. Press Ctrl+C to stop.");
+        
+        while running.load(std::sync::atomic::Ordering::SeqCst) {
+            if let Err(e) = process_changes(&config, args.dry_run, args.push) {
+                log::error!("Error processing changes: {}", e);
+            }
+            
+            // Wait before next scan
+            log::info!("Waiting 5 seconds before next scan...");
+            for _ in 0..50 {
+                if !running.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
+
+        log::info!("git-chai stopped");
+        Ok(())
+    } else {
+        // Normal mode: run once and exit
+        log::info!("git-chai: Running once");
+        process_changes(&config, args.dry_run, args.push)
+    }
 }
