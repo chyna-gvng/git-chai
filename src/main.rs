@@ -10,7 +10,7 @@ use crate::git::{get_changed_files, stage_file, create_commit_for_file, push_cha
 use crate::config::Config;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(about, long_about = None, disable_version_flag = true)]
 struct Args {
     /// Path to git repository
     #[arg(short, long, default_value = ".")]
@@ -31,6 +31,10 @@ struct Args {
     /// Headless mode - run continuously until interrupted
     #[arg(short = '!', long, default_value_t = false)]
     headless: bool,
+    
+    /// Show version information
+    #[arg(short = '?', long = "version")]
+    version: bool,
 }
 
 fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
@@ -147,6 +151,11 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
 fn main() -> Result<()> {
     env_logger::init();
     let args = Args::parse();
+    
+    if args.version {
+        println!("git-chai 0.1.0");
+        return Ok(());
+    }
     
     let config = Config {
         repo_path: args.repo_path,
