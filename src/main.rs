@@ -29,7 +29,7 @@ struct Args {
     verbose: bool,
     
     /// Headless mode - run continuously until interrupted
-    #[arg(short = 'H', long, default_value_t = false)]
+    #[arg(short = '!', long, default_value_t = false)]
     headless: bool,
 }
 
