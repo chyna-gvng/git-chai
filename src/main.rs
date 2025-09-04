@@ -17,7 +17,7 @@ struct Args {
     repo_path: PathBuf,
     
     /// Push changes to remote after committing
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = false)]
     push: bool,
     
     /// Dry run - show what would be committed without actually committing
@@ -37,7 +37,7 @@ struct Args {
     version: bool,
 }
 
-fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
+fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) -> Result<()> {
     log::info!("Scanning for changes in {:?}...", config.repo_path);
     
     let changes = match get_changed_files(&config.repo_path) {
@@ -74,13 +74,27 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
     
     for group in change_groups {
         if dry_run {
-            log::info!("Dry run: Would process group: {:?}", group);
+            if verbose {
+                log::info!("DRY RUN: Would process group - Type: {}, Path: {}, Files: {:?}", 
+                    group.change_type, group.path.display(), group.files);
+                if let Some(ref change_types) = group.file_change_types {
+                    log::info!("DRY RUN: Change types: {:?}", change_types);
+                }
+            } else {
+                log::info!("DRY RUN: Would process {} files in {}: {}", 
+                    group.files.len(), group.change_type, group.path.display());
+            }
             continue;
         }
         
         if group.change_type != "individual" && group.change_type != "mixed" {
             // Directory with uniform changes - commit as a group
-            log::info!("Processing directory: {}: {}", group.change_type, group.path.display());
+            if verbose {
+                log::info!("Processing directory: {}: {} (would stage all files and commit)", 
+                    group.change_type, group.path.display());
+            } else {
+                log::info!("Processing directory: {}: {}", group.change_type, group.path.display());
+            }
             
             if let Err(e) = stage_directory(&config.repo_path, &group.path) {
                 log::error!("Failed to stage directory {}: {}", group.path.display(), e);
@@ -92,7 +106,13 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
                 continue;
             }
             
-            log::info!("Committed directory: {}: {}", group.change_type, group.path.display());
+            if verbose {
+                log::info!("Committed directory: {}: {} (commit message: '{}: {}')", 
+                    group.change_type, group.path.display(), group.change_type, 
+                    group.path.file_name().and_then(|n| n.to_str()).unwrap_or("directory"));
+            } else {
+                log::info!("Committed directory: {}: {}", group.change_type, group.path.display());
+            }
         } else {
             // Mixed changes or single file - process individually
             for (i, file_entry) in group.files.iter().enumerate() {
@@ -115,7 +135,11 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
                     "mod"
                 };
                 
-                log::info!("Processing: {}: {}", change_type, clean_filename);
+                if verbose {
+                    log::info!("Processing: {}: {} (would stage and commit)", change_type, clean_filename);
+                } else {
+                    log::info!("Processing: {}: {}", change_type, clean_filename);
+                }
                 
                 if let Err(e) = stage_file(&config.repo_path, clean_filename) {
                     log::error!("Failed to stage file {}: {}", clean_filename, e);
@@ -127,20 +151,27 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
                     continue;
                 }
                 
-                log::info!("Committed: {}: {}", change_type, clean_filename);
+                if verbose {
+                    log::info!("Committed: {}: {} (commit message: '{}: {}')", 
+                        change_type, clean_filename, change_type, clean_filename);
+                } else {
+                    log::info!("Committed: {}: {}", change_type, clean_filename);
+                }
             }
         }
     }
     
     log::info!("Successfully committed all changes!");
 
-    if push {
+    if push && !dry_run {
         if let Err(e) = push_changes(&config.repo_path) {
             log::warn!("Failed to push changes: {}", e);
             log::warn!("Changes were committed locally but not pushed to remote.");
         } else {
             log::info!("Successfully pushed changes to remote!");
         }
+    } else if push && dry_run {
+        log::info!("DRY RUN: Would push changes to remote");
     } else {
         log::info!("Skipping push (--no-push specified)");
     }
@@ -149,8 +180,17 @@ fn process_changes(config: &Config, dry_run: bool, push: bool) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    env_logger::init();
     let args = Args::parse();
+    
+    // Set up logging based on verbose flag
+    unsafe {
+        if args.verbose {
+            std::env::set_var("RUST_LOG", "debug");
+        } else {
+            std::env::set_var("RUST_LOG", "info");
+        }
+    }
+    env_logger::init();
     
     if args.version {
         println!("git-chai 0.1.0");
@@ -180,7 +220,7 @@ fn main() -> Result<()> {
         log::info!("git-chai: Starting in headless mode. Press Ctrl+C to stop.");
         
         while running.load(std::sync::atomic::Ordering::SeqCst) {
-            if let Err(e) = process_changes(&config, args.dry_run, args.push) {
+            if let Err(e) = process_changes(&config, args.dry_run, args.push, args.verbose) {
                 log::error!("Error processing changes: {}", e);
             }
             
@@ -199,6 +239,6 @@ fn main() -> Result<()> {
     } else {
         // Normal mode: run once and exit
         log::info!("git-chai: Running once");
-        process_changes(&config, args.dry_run, args.push)
+        process_changes(&config, args.dry_run, args.push, args.verbose)
     }
 }
