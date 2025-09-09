@@ -1,15 +1,17 @@
+mod config;
 mod error;
 mod git;
-mod config;
 mod types;
 
+use crate::config::Config;
+use crate::git::{
+    ChangeGroup, create_commit_for_directory, create_commit_for_file, get_changed_files,
+    group_changes_by_directory, push_changes, stage_directory, stage_file,
+};
 use anyhow::Result;
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::path::Path;
-use crate::git::{get_changed_files, stage_file, create_commit_for_file, push_changes, group_changes_by_directory, stage_directory, create_commit_for_directory, ChangeGroup};
-use crate::config::Config;
 
 #[derive(Parser, Debug)]
 #[command(about, long_about = None, disable_version_flag = true)]
@@ -17,23 +19,23 @@ struct Args {
     /// Path to git repository
     #[arg(short, long, default_value = ".")]
     repo_path: PathBuf,
-    
+
     /// Push changes to remote after committing
     #[arg(short, long, default_value_t = false)]
     push: bool,
-    
+
     /// Dry run - show what would be committed without actually committing
     #[arg(short, long, default_value_t = false)]
     dry_run: bool,
-    
+
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-    
+
     /// Headless mode - run continuously until interrupted
     #[arg(short = '!', long, default_value_t = false)]
     headless: bool,
-    
+
     /// Show version information
     #[arg(short = '?', long = "version")]
     version: bool,
@@ -41,7 +43,7 @@ struct Args {
 
 fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) -> Result<()> {
     log::info!("Scanning for changes in {:?}...", config.repo_path);
-    
+
     let changes = match get_changed_files(&config.repo_path) {
         Ok(changes) => {
             if changes.is_empty() {
@@ -55,77 +57,104 @@ fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) ->
             std::process::exit(1);
         }
     };
-    
+
     let change_groups = match group_changes_by_directory(&config.repo_path, &changes) {
         Ok(groups) => groups,
         Err(e) => {
             log::error!("Failed to group changes by directory: {}", e);
-            // Fall back to individual processing
-            changes.iter()
-                .map(|change| {
-                    ChangeGroup {
-                        path: PathBuf::from("."),
-                        change_type: "individual".to_string(),
-                        files: vec![change.filename.clone()],
-                        file_change_types: Some(vec![change.change_type.to_string()]),
-                    }
+            changes
+                .iter()
+                .map(|change| ChangeGroup {
+                    path: PathBuf::from("."),
+                    change_type: "individual".to_string(),
+                    files: vec![change.filename.clone()],
+                    file_change_types: Some(vec![change.change_type.to_string()]),
                 })
                 .collect()
         }
     };
-    
+
     for group in change_groups {
         if dry_run {
             if verbose {
-                log::info!("DRY RUN: Would process group - Type: {}, Path: {}, Files: {:?}", 
-                    group.change_type, group.path.display(), group.files);
+                log::info!(
+                    "DRY RUN: Would process group - Type: {}, Path: {}, Files: {:?}",
+                    group.change_type,
+                    group.path.display(),
+                    group.files
+                );
                 if let Some(ref change_types) = group.file_change_types {
                     log::info!("DRY RUN: Change types: {:?}", change_types);
                 }
             } else {
-                log::info!("DRY RUN: Would process {} files in {}: {}", 
-                    group.files.len(), group.change_type, group.path.display());
+                log::info!(
+                    "DRY RUN: Would process {} files in {}: {}",
+                    group.files.len(),
+                    group.change_type,
+                    group.path.display()
+                );
             }
             continue;
         }
-        
+
         if group.change_type != "individual" && group.change_type != "mixed" {
-            // Directory with uniform changes - commit as a group
             if verbose {
-                log::info!("Processing directory: {}: {} (would stage all files and commit)", 
-                    group.change_type, group.path.display());
+                log::info!(
+                    "Processing directory: {}: {} (would stage all files and commit)",
+                    group.change_type,
+                    group.path.display()
+                );
             } else {
-                log::info!("Processing directory: {}: {}", group.change_type, group.path.display());
+                log::info!(
+                    "Processing directory: {}: {}",
+                    group.change_type,
+                    group.path.display()
+                );
             }
-            
+
             if let Err(e) = stage_directory(&config.repo_path, &group.path) {
                 log::error!("Failed to stage directory {}: {}", group.path.display(), e);
                 continue;
             }
-            
-            if let Err(e) = create_commit_for_directory(&config.repo_path, &group.path, &group.change_type) {
-                log::error!("Failed to create commit for directory {}: {}", group.path.display(), e);
+
+            if let Err(e) =
+                create_commit_for_directory(&config.repo_path, &group.path, &group.change_type)
+            {
+                log::error!(
+                    "Failed to create commit for directory {}: {}",
+                    group.path.display(),
+                    e
+                );
                 continue;
             }
-            
+
             if verbose {
-                log::info!("Committed directory: {}: {} (commit message: '{}: {}')", 
-                    group.change_type, group.path.display(), group.change_type, 
-                    group.path.file_name().and_then(|n| n.to_str()).unwrap_or("directory"));
+                log::info!(
+                    "Committed directory: {}: {} (commit message: '{}: {}')",
+                    group.change_type,
+                    group.path.display(),
+                    group.change_type,
+                    group
+                        .path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("directory")
+                );
             } else {
-                log::info!("Committed directory: {}: {}", group.change_type, group.path.display());
+                log::info!(
+                    "Committed directory: {}: {}",
+                    group.change_type,
+                    group.path.display()
+                );
             }
         } else {
-            // Mixed changes or single file - process individually
             for (i, file_entry) in group.files.iter().enumerate() {
                 let clean_filename = file_entry;
-                
-                // Get the change type for this file
+
                 let change_type = if let Some(ref change_types) = group.file_change_types {
                     if i < change_types.len() {
                         &change_types[i]
                     } else {
-                        // Fallback: determine from filename (shouldn't happen)
                         if clean_filename.ends_with("/") {
                             "add"
                         } else {
@@ -133,36 +162,46 @@ fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) ->
                         }
                     }
                 } else {
-                    // Fallback for groups without change types
                     "mod"
                 };
-                
+
                 if verbose {
-                    log::info!("Processing: {}: {} (would stage and commit)", change_type, clean_filename);
+                    log::info!(
+                        "Processing: {}: {} (would stage and commit)",
+                        change_type,
+                        clean_filename
+                    );
                 } else {
                     log::info!("Processing: {}: {}", change_type, clean_filename);
                 }
-                
+
                 if let Err(e) = stage_file(&config.repo_path, clean_filename) {
                     log::error!("Failed to stage file {}: {}", clean_filename, e);
                     continue;
                 }
-                
-                if let Err(e) = create_commit_for_file(&config.repo_path, clean_filename, change_type) {
+
+                if let Err(e) =
+                    create_commit_for_file(&config.repo_path, clean_filename, change_type)
+                {
                     log::error!("Failed to create commit for {}: {}", clean_filename, e);
                     continue;
                 }
-                
+
                 if verbose {
-                    log::info!("Committed: {}: {} (commit message: '{}: {}')", 
-                        change_type, clean_filename, change_type, clean_filename);
+                    log::info!(
+                        "Committed: {}: {} (commit message: '{}: {}')",
+                        change_type,
+                        clean_filename,
+                        change_type,
+                        clean_filename
+                    );
                 } else {
                     log::info!("Committed: {}: {}", change_type, clean_filename);
                 }
             }
         }
     }
-    
+
     log::info!("Successfully committed all changes!");
 
     if push && !dry_run {
@@ -177,7 +216,7 @@ fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) ->
     } else {
         log::info!("Skipping push (--no-push specified)");
     }
-    
+
     Ok(())
 }
 
@@ -202,8 +241,7 @@ fn resolve_repo_toplevel(path: &Path) -> anyhow::Result<PathBuf> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    
-    // Set up logging based on verbose flag
+
     unsafe {
         if args.verbose {
             std::env::set_var("RUST_LOG", "debug");
@@ -212,17 +250,20 @@ fn main() -> Result<()> {
         }
     }
     env_logger::init();
-    
+
     if args.version {
         println!("git-chai 0.1.0");
         return Ok(());
     }
-    
-    // Resolve the repository top-level so git commands always run from the repo root.
+
     let repo_root = match resolve_repo_toplevel(&args.repo_path) {
         Ok(p) => p,
         Err(e) => {
-            log::error!("Failed to resolve git repo top-level for {:?}: {}", args.repo_path, e);
+            log::error!(
+                "Failed to resolve git repo top-level for {:?}: {}",
+                args.repo_path,
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -233,28 +274,26 @@ fn main() -> Result<()> {
         commit_message_template: "{change_type}: {name}".to_string(),
         min_files_for_directory_commit: 2,
     };
-    
+
     if args.headless {
-        // Headless mode: run continuously until Ctrl+C
         use std::thread;
         use std::time::Duration;
-        
-        // Set up Ctrl+C handler
+
         let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
         let r = running.clone();
         ctrlc::set_handler(move || {
             r.store(false, std::sync::atomic::Ordering::SeqCst);
             println!("\nReceived interrupt signal, shutting down...");
-        }).expect("Error setting Ctrl+C handler");
+        })
+        .expect("Error setting Ctrl+C handler");
 
         log::info!("git-chai: Starting in headless mode. Press Ctrl+C to stop.");
-        
+
         while running.load(std::sync::atomic::Ordering::SeqCst) {
             if let Err(e) = process_changes(&config, args.dry_run, args.push, args.verbose) {
                 log::error!("Error processing changes: {}", e);
             }
-            
-            // Wait before next scan
+
             log::info!("Waiting 5 seconds before next scan...");
             for _ in 0..50 {
                 if !running.load(std::sync::atomic::Ordering::SeqCst) {
@@ -267,7 +306,6 @@ fn main() -> Result<()> {
         log::info!("git-chai stopped");
         Ok(())
     } else {
-        // Normal mode: run once and exit
         log::info!("git-chai: Running once");
         process_changes(&config, args.dry_run, args.push, args.verbose)
     }
