@@ -3,23 +3,23 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GitStatus {
-    AddedStaged,        // A: file added to index
-    ModifiedStaged,     // M: file modified in index
-    DeletedStaged,      // D: file deleted from index
-    AddedUnstaged,      // A: file added in working tree
-    ModifiedUnstaged,   // M: file modified in working tree  
-    DeletedUnstaged,    // D: file deleted in working tree
-    Untracked,          // ??: untracked file
-    Renamed,            // R: renamed
-    Copied,             // C: copied
-    Unmerged,           // U: unmerged
-    Ignored,            // !: ignored
-    Unknown(String),    // Unknown status code
+    AddedStaged,      // A: file added to index
+    ModifiedStaged,   // M: file modified in index
+    DeletedStaged,    // D: file deleted from index
+    AddedUnstaged,    // A: file added in working tree
+    ModifiedUnstaged, // M: file modified in working tree
+    DeletedUnstaged,  // D: file deleted in working tree
+    Untracked,        // ??: untracked file
+    Renamed,          // R: renamed
+    Copied,           // C: copied
+    Unmerged,         // U: unmerged
+    Ignored,          // !: ignored
+    Unknown(String),  // Unknown status code
 }
 
 impl FromStr for GitStatus {
     type Err = crate::error::GitChaiError;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "A " => Ok(GitStatus::AddedStaged),
@@ -69,7 +69,9 @@ pub enum ChangeType {
 impl From<GitStatus> for ChangeType {
     fn from(status: GitStatus) -> Self {
         match status {
-            GitStatus::AddedStaged | GitStatus::AddedUnstaged | GitStatus::Untracked => ChangeType::Add,
+            GitStatus::AddedStaged | GitStatus::AddedUnstaged | GitStatus::Untracked => {
+                ChangeType::Add
+            }
             GitStatus::ModifiedStaged | GitStatus::ModifiedUnstaged => ChangeType::Modify,
             GitStatus::DeletedStaged | GitStatus::DeletedUnstaged => ChangeType::Delete,
             GitStatus::Renamed => ChangeType::Rename,
@@ -98,17 +100,26 @@ mod tests {
     #[test]
     fn test_git_status_parsing() {
         assert_eq!(GitStatus::from_str("A ").unwrap(), GitStatus::AddedStaged);
-        assert_eq!(GitStatus::from_str("M ").unwrap(), GitStatus::ModifiedStaged);
+        assert_eq!(
+            GitStatus::from_str("M ").unwrap(),
+            GitStatus::ModifiedStaged
+        );
         assert_eq!(GitStatus::from_str("D ").unwrap(), GitStatus::DeletedStaged);
         assert_eq!(GitStatus::from_str(" A").unwrap(), GitStatus::AddedUnstaged);
-        assert_eq!(GitStatus::from_str(" M").unwrap(), GitStatus::ModifiedUnstaged);
-        assert_eq!(GitStatus::from_str(" D").unwrap(), GitStatus::DeletedUnstaged);
+        assert_eq!(
+            GitStatus::from_str(" M").unwrap(),
+            GitStatus::ModifiedUnstaged
+        );
+        assert_eq!(
+            GitStatus::from_str(" D").unwrap(),
+            GitStatus::DeletedUnstaged
+        );
         assert_eq!(GitStatus::from_str("??").unwrap(), GitStatus::Untracked);
         assert_eq!(GitStatus::from_str("R ").unwrap(), GitStatus::Renamed);
         assert_eq!(GitStatus::from_str("C ").unwrap(), GitStatus::Copied);
         assert_eq!(GitStatus::from_str("U ").unwrap(), GitStatus::Unmerged);
         assert_eq!(GitStatus::from_str("! ").unwrap(), GitStatus::Ignored);
-        
+
         // Test unknown status
         let unknown = GitStatus::from_str("X ").unwrap();
         match unknown {
@@ -138,17 +149,32 @@ mod tests {
         assert_eq!(ChangeType::from(GitStatus::AddedStaged), ChangeType::Add);
         assert_eq!(ChangeType::from(GitStatus::AddedUnstaged), ChangeType::Add);
         assert_eq!(ChangeType::from(GitStatus::Untracked), ChangeType::Add);
-        assert_eq!(ChangeType::from(GitStatus::ModifiedStaged), ChangeType::Modify);
-        assert_eq!(ChangeType::from(GitStatus::ModifiedUnstaged), ChangeType::Modify);
-        assert_eq!(ChangeType::from(GitStatus::DeletedStaged), ChangeType::Delete);
-        assert_eq!(ChangeType::from(GitStatus::DeletedUnstaged), ChangeType::Delete);
+        assert_eq!(
+            ChangeType::from(GitStatus::ModifiedStaged),
+            ChangeType::Modify
+        );
+        assert_eq!(
+            ChangeType::from(GitStatus::ModifiedUnstaged),
+            ChangeType::Modify
+        );
+        assert_eq!(
+            ChangeType::from(GitStatus::DeletedStaged),
+            ChangeType::Delete
+        );
+        assert_eq!(
+            ChangeType::from(GitStatus::DeletedUnstaged),
+            ChangeType::Delete
+        );
         assert_eq!(ChangeType::from(GitStatus::Renamed), ChangeType::Rename);
         assert_eq!(ChangeType::from(GitStatus::Copied), ChangeType::Copy);
-        
+
         // Test fallbacks
         assert_eq!(ChangeType::from(GitStatus::Unmerged), ChangeType::Modify);
         assert_eq!(ChangeType::from(GitStatus::Ignored), ChangeType::Modify);
-        assert_eq!(ChangeType::from(GitStatus::Unknown("".to_string())), ChangeType::Modify);
+        assert_eq!(
+            ChangeType::from(GitStatus::Unknown("".to_string())),
+            ChangeType::Modify
+        );
     }
 
     #[test]
