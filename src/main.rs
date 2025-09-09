@@ -6,6 +6,8 @@ mod types;
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
+use std::process::Command;
+use std::path::Path;
 use crate::git::{get_changed_files, stage_file, create_commit_for_file, push_changes, group_changes_by_directory, stage_directory, create_commit_for_directory, ChangeGroup};
 use crate::config::Config;
 
@@ -179,6 +181,25 @@ fn process_changes(config: &Config, dry_run: bool, push: bool, verbose: bool) ->
     Ok(())
 }
 
+fn resolve_repo_toplevel(path: &Path) -> anyhow::Result<PathBuf> {
+    let output = Command::new("git")
+        .current_dir(path)
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to run git rev-parse: {}", e))?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "git rev-parse --show-toplevel failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let toplevel = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(PathBuf::from(toplevel))
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     
@@ -197,8 +218,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
     
+    // Resolve the repository top-level so git commands always run from the repo root.
+    let repo_root = match resolve_repo_toplevel(&args.repo_path) {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("Failed to resolve git repo top-level for {:?}: {}", args.repo_path, e);
+            std::process::exit(1);
+        }
+    };
+
     let config = Config {
-        repo_path: args.repo_path,
+        repo_path: repo_root,
         push_by_default: args.push,
         commit_message_template: "{change_type}: {name}".to_string(),
         min_files_for_directory_commit: 2,
