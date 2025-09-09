@@ -10,17 +10,13 @@ pub enum GitChaiError {
         #[source]
         source: Option<std::io::Error>,
     },
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("Parse error: {0}")]
     ParseError(String),
-    
-
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -34,13 +30,12 @@ mod tests {
             source: None,
         };
         assert!(git_error.to_string().contains("Git command failed"));
-        
-        let io_error = GitChaiError::IoError(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+
+        let io_error =
+            GitChaiError::IoError(std::io::Error::new(std::io::ErrorKind::Other, "test"));
         assert!(io_error.to_string().contains("IO error"));
-        
+
         let parse_error = GitChaiError::ParseError("test".to_string());
         assert!(parse_error.to_string().contains("Parse error"));
-        
-
     }
 }
